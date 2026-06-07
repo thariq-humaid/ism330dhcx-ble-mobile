@@ -1,0 +1,1168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#080a0d" />
+  <title>ISM330DHCX • HAR Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    /* ─── DESIGN TOKENS ─────────────────────────────────────────────────── */
+    :root {
+      --bg:         #080a0d;
+      --bg-grid:    #0c1015;
+      --surface:    #10141a;
+      --surface-2:  #161b23;
+      --border:     #1f2632;
+      --border-hi:  #2a3340;
+      --text:       #e6ebf2;
+      --text-mute:  #6b7785;
+      --text-dim:   #4a5260;
+
+      --accent:     #00d4ff;   /* signal cyan */
+      --accent-dim: #0088a8;
+      --ok:         #34d399;
+      --warn:       #fbbf24;
+      --err:        #ef4444;
+
+      --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+      --pad: 16px;
+      --pad-lg: 20px;
+      --gap: 14px;
+
+      --shadow: 0 1px 0 0 rgba(255,255,255,0.02) inset,
+                0 0 0 1px var(--border);
+
+      --tick: linear-gradient(180deg,
+              transparent 0, transparent calc(100% - 1px),
+              var(--border) calc(100% - 1px), var(--border) 100%);
+    }
+
+    /* ─── RESET ─────────────────────────────────────────────────────────── */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: var(--bg); color: var(--text); }
+    body {
+      font-family: var(--mono);
+      font-feature-settings: "ss01", "cv02", "cv11";
+      font-weight: 400;
+      line-height: 1.45;
+      min-height: 100vh;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right)
+               env(safe-area-inset-bottom) env(safe-area-inset-left);
+      /* faint dot grid */
+      background-image:
+        radial-gradient(circle at 1px 1px, var(--bg-grid) 1px, transparent 0);
+      background-size: 22px 22px;
+      background-attachment: fixed;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: geometricPrecision;
+    }
+    button { font-family: inherit; cursor: pointer; }
+    input { font-family: inherit; }
+
+    /* ─── LAYOUT ────────────────────────────────────────────────────────── */
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: var(--pad);
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap);
+    }
+
+    /* ─── HEADER ────────────────────────────────────────────────────────── */
+    .head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 4px 2px 12px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    .head::after {
+      content: '';
+      position: absolute;
+      left: 0; bottom: -1px;
+      width: 40px; height: 1px;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .brand .eyebrow {
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+    .brand h1 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .brand h1 .dot { color: var(--accent); margin: 0 4px; }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 11px;
+      font-size: 10.5px;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-mute);
+      white-space: nowrap;
+    }
+    .status::before {
+      content: '';
+      width: 7px; height: 7px;
+      background: currentColor;
+      box-shadow: 0 0 6px currentColor;
+    }
+    .status.connected     { color: var(--ok);   border-color: rgba(52,211,153,.3); }
+    .status.connecting    { color: var(--warn); border-color: rgba(251,191,36,.3); animation: pulse 1.2s ease-in-out infinite; }
+    .status.disconnected  { color: var(--err);  border-color: rgba(239,68,68,.25); }
+    .status.error         { color: var(--err);  border-color: rgba(239,68,68,.4); }
+    @keyframes pulse { 50% { opacity: .45; } }
+
+    /* ─── BUTTONS ───────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 16px;
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      font-size: 11.5px;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      transition: border-color .12s ease, background .12s ease, color .12s ease;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .btn:hover { border-color: var(--border-hi); }
+    .btn:active { transform: translateY(1px); }
+    .btn.primary {
+      background: var(--accent);
+      color: #001821;
+      border-color: var(--accent);
+      font-weight: 700;
+      box-shadow: 0 0 0 1px var(--accent), 0 0 24px rgba(0,212,255,.25);
+    }
+    .btn.primary:hover { background: #4de3ff; border-color: #4de3ff; }
+    .btn.danger:hover { color: var(--err); border-color: rgba(239,68,68,.4); }
+    .btn.small {
+      padding: 6px 10px;
+      font-size: 10px;
+    }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+    /* ─── CONNECT BAR ───────────────────────────────────────────────────── */
+    .connect {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .connect .btn.primary { width: 100%; padding: 16px; font-size: 13px; }
+    .device-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .device-info .label {
+      font-size: 9.5px;
+      letter-spacing: 0.18em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+    .device-info .name {
+      flex: 1;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ok);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .banner {
+      padding: 10px 12px;
+      background: rgba(239,68,68,.08);
+      border: 1px solid rgba(239,68,68,.25);
+      color: var(--err);
+      font-size: 11.5px;
+      letter-spacing: 0.04em;
+    }
+    .banner.info {
+      background: rgba(0,212,255,.06);
+      border-color: rgba(0,212,255,.2);
+      color: var(--accent);
+    }
+
+    /* ─── PANEL (generic card) ──────────────────────────────────────────── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      position: relative;
+    }
+    .panel > header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+    .panel > header h2 {
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-mute);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .panel > header h2::before {
+      content: '';
+      width: 4px; height: 4px;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+    }
+    .panel > header .actions { display: flex; gap: 6px; }
+    .panel .body { padding: 14px; }
+
+    /* ─── LIVE CARD ─────────────────────────────────────────────────────── */
+    .live {
+      --live-accent: var(--text-mute);
+      position: relative;
+      padding: 22px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      isolation: isolate;
+    }
+    .live::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(135deg,
+          color-mix(in oklab, var(--live-accent) 14%, transparent) 0%,
+          transparent 55%),
+        repeating-linear-gradient(
+          0deg,
+          transparent 0px,
+          transparent 3px,
+          rgba(255,255,255,0.012) 3px,
+          rgba(255,255,255,0.012) 4px);
+      z-index: -1;
+      transition: background .25s ease;
+    }
+    .live::after {
+      content: '';
+      position: absolute;
+      left: 0; top: 0;
+      width: 3px; height: 100%;
+      background: var(--live-accent);
+      box-shadow: 0 0 12px var(--live-accent);
+      transition: background .25s ease, box-shadow .25s ease;
+    }
+    .live .meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+      font-weight: 500;
+    }
+    .live .meta .count {
+      color: var(--text-mute);
+      font-variant-numeric: tabular-nums;
+    }
+    .live .value {
+      font-size: clamp(28px, 9vw, 44px);
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.05;
+      color: var(--live-accent);
+      transition: color .25s ease;
+      word-break: break-word;
+      text-shadow: 0 0 24px color-mix(in oklab, var(--live-accent) 35%, transparent);
+    }
+    .live .value.placeholder { color: var(--text-dim); text-shadow: none; }
+    .live .sub {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+      color: var(--text-mute);
+      font-variant-numeric: tabular-nums;
+    }
+    .live .sub .hex {
+      color: var(--text);
+      font-weight: 500;
+      letter-spacing: 0.05em;
+    }
+    .live .sub .tick {
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+      position: relative;
+    }
+    .live .sub .tick::after {
+      content: '';
+      position: absolute;
+      right: 0; top: -2px;
+      width: 1px; height: 5px;
+      background: var(--border-hi);
+    }
+    .live.flash::before {
+      animation: liveFlash .55s ease-out;
+    }
+    @keyframes liveFlash {
+      0%   { background-color: color-mix(in oklab, var(--live-accent) 22%, transparent); }
+      100% { background-color: transparent; }
+    }
+
+    /* ─── LABEL EDITOR ──────────────────────────────────────────────────── */
+    .labels-empty {
+      padding: 18px 14px;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      border: 1px dashed var(--border);
+    }
+    .label-row {
+      display: grid;
+      grid-template-columns: 78px 1fr auto auto;
+      gap: 8px;
+      align-items: center;
+      padding: 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      margin-bottom: 8px;
+    }
+    .label-row:last-child { margin-bottom: 0; }
+    .label-row input {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 9px 10px;
+      font-size: 13px;
+      font-weight: 500;
+      min-width: 0;
+      width: 100%;
+      letter-spacing: 0.02em;
+    }
+    .label-row input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+    .label-row .hex-in {
+      font-variant-numeric: tabular-nums;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .swatches {
+      display: flex;
+      gap: 3px;
+    }
+    .swatch {
+      width: 18px; height: 18px;
+      border: 1px solid var(--border);
+      background: var(--swatch);
+      cursor: pointer;
+      transition: transform .1s ease;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .swatch.active {
+      border-color: var(--text);
+      box-shadow: 0 0 0 1px var(--text), inset 0 0 0 2px var(--bg);
+      transform: scale(1.1);
+    }
+    .row-del {
+      background: var(--bg);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      width: 30px; height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      transition: all .12s ease;
+    }
+    .row-del:hover { color: var(--err); border-color: rgba(239,68,68,.4); }
+
+    /* ─── CHART ─────────────────────────────────────────────────────────── */
+    .chart-empty {
+      padding: 18px 14px;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .bar-row {
+      display: grid;
+      grid-template-columns: 88px 1fr 56px;
+      gap: 10px;
+      align-items: center;
+      padding: 5px 0;
+      font-size: 12px;
+    }
+    .bar-row .bar-label {
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 500;
+    }
+    .bar-row .bar-label .h { color: var(--text-dim); margin-right: 6px; }
+    .bar-row .bar-track {
+      height: 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+    .bar-row .bar-track::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: var(--w, 0%);
+      background:
+        linear-gradient(90deg,
+          color-mix(in oklab, var(--bar-color, var(--accent)) 25%, transparent),
+          var(--bar-color, var(--accent)));
+      box-shadow: 0 0 8px color-mix(in oklab, var(--bar-color, var(--accent)) 40%, transparent);
+      transition: width .35s cubic-bezier(.2,.7,.2,1);
+    }
+    .bar-row .bar-count {
+      text-align: right;
+      color: var(--text-mute);
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+    }
+
+    /* ─── LOG ───────────────────────────────────────────────────────────── */
+    .log {
+      max-height: 320px;
+      overflow-y: auto;
+      padding: 0;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-hi) transparent;
+    }
+    .log::-webkit-scrollbar { width: 6px; }
+    .log::-webkit-scrollbar-thumb { background: var(--border-hi); }
+    .log-empty {
+      padding: 18px 14px;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .log-entry {
+      display: grid;
+      grid-template-columns: 78px 14px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 7px 12px;
+      font-size: 12px;
+      border-bottom: 1px solid var(--bg-grid);
+      font-variant-numeric: tabular-nums;
+      animation: logIn .22s ease-out;
+    }
+    .log-entry:last-child { border-bottom: none; }
+    .log-entry .t { color: var(--text-dim); font-size: 11px; }
+    .log-entry .c {
+      width: 8px; height: 8px;
+      background: var(--c, var(--text-mute));
+      box-shadow: 0 0 6px var(--c, transparent);
+    }
+    .log-entry .l {
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .log-entry .l.unlabeled { color: var(--text-mute); }
+    .log-entry .h {
+      color: var(--text-dim);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+    }
+    @keyframes logIn {
+      from { opacity: 0; transform: translateY(-3px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─── FOOTER ────────────────────────────────────────────────────────── */
+    .foot {
+      margin-top: 8px;
+      padding: 14px 2px 6px;
+      border-top: 1px solid var(--border);
+      font-size: 9.5px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .foot .uuid { color: var(--text-mute); letter-spacing: 0.04em; text-transform: none; }
+
+    /* ─── COMPACT MOBILE ────────────────────────────────────────────────── */
+    @media (max-width: 420px) {
+      .wrap { padding: 12px; gap: 12px; }
+      .label-row { grid-template-columns: 72px 1fr; grid-template-areas:
+        'hex name'
+        'sw  del';
+        gap: 8px; }
+      .label-row .hex-in { grid-area: hex; }
+      .label-row .name-in { grid-area: name; }
+      .label-row .swatches { grid-area: sw; }
+      .label-row .row-del { grid-area: del; justify-self: end; }
+    }
+
+    /* ─── ACCESSIBILITY HELPERS ─────────────────────────────────────────── */
+    .sr-only {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+
+<body>
+  <main class="wrap">
+    <!-- ① HEADER ─────────────────────────────────────────────────────── -->
+    <header class="head">
+      <div class="brand">
+        <span class="eyebrow">ISM330DHCX · MLC</span>
+        <h1>HAR <span class="dot">·</span> LIVE DASHBOARD</h1>
+      </div>
+      <div id="status" class="status disconnected" aria-live="polite">DISCONNECTED</div>
+    </header>
+
+    <!-- ② BROWSER SUPPORT BANNER (shown if Web Bluetooth unavailable) ─── -->
+    <div id="unsupportedBanner" class="banner" hidden>
+      Web Bluetooth is not available in this browser. Use Chrome on Android,
+      or Chrome/Edge on desktop, served over HTTPS or localhost.
+    </div>
+
+    <!-- ③ CONNECT BAR ───────────────────────────────────────────────── -->
+    <section class="connect" aria-label="Connection">
+      <button id="connectBtn" class="btn primary">SCAN &amp; CONNECT</button>
+      <div id="deviceInfo" class="device-info" hidden>
+        <span class="label">DEVICE</span>
+        <span class="name" id="deviceName">—</span>
+        <button id="disconnectBtn" class="btn small danger">DISCONNECT</button>
+      </div>
+      <div id="errorBanner" class="banner" hidden></div>
+    </section>
+
+    <!-- ④ LIVE RESULT CARD ──────────────────────────────────────────── -->
+    <section class="live" id="liveCard" aria-label="Current classification">
+      <div class="meta">
+        <span>CURRENT CLASS</span>
+        <span class="count" id="liveCount">0 EVENTS</span>
+      </div>
+      <div class="value placeholder" id="liveValue">AWAITING&nbsp;DATA</div>
+      <div class="sub">
+        <span class="hex" id="liveHex">0x—</span>
+        <span class="tick"></span>
+        <span id="liveTime">—</span>
+      </div>
+    </section>
+
+    <!-- ⑤ LABEL MAP EDITOR ──────────────────────────────────────────── -->
+    <section class="panel" aria-label="Label mappings">
+      <header>
+        <h2>Label Map</h2>
+        <div class="actions">
+          <button id="addLabelBtn" class="btn small">+ MAPPING</button>
+        </div>
+      </header>
+      <div class="body">
+        <div id="labelsList"></div>
+        <div id="labelsEmpty" class="labels-empty">
+          No mappings · tap + MAPPING to assign labels
+        </div>
+      </div>
+    </section>
+
+    <!-- ⑥ DISTRIBUTION CHART ────────────────────────────────────────── -->
+    <section class="panel" aria-label="Class distribution">
+      <header>
+        <h2>Distribution</h2>
+        <div class="actions">
+          <button id="resetChartBtn" class="btn small">RESET</button>
+        </div>
+      </header>
+      <div class="body">
+        <div id="chart"></div>
+        <div id="chartEmpty" class="chart-empty">No samples yet</div>
+      </div>
+    </section>
+
+    <!-- ⑦ EVENT LOG ─────────────────────────────────────────────────── -->
+    <section class="panel" aria-label="Event log">
+      <header>
+        <h2>Event Log</h2>
+        <div class="actions">
+          <button id="clearLogBtn" class="btn small">CLEAR</button>
+        </div>
+      </header>
+      <div class="log" id="log">
+        <div id="logEmpty" class="log-empty">Log empty</div>
+      </div>
+    </section>
+
+    <!-- ⑧ FOOTER ────────────────────────────────────────────────────── -->
+    <footer class="foot">
+      <span>Web Bluetooth Client · v1.0</span>
+      <span class="uuid">svc 6a591486…8d36</span>
+    </footer>
+  </main>
+
+  <script>
+    'use strict';
+
+    // ─── BLE CONSTANTS (must match firmware) ─────────────────────────────
+    const SERVICE_UUID = '6a591486-b90f-45b8-b5f4-e4bb09768d36';
+    const DATA_UUID    = '4e2447ff-2860-4fe6-818f-db0579c1c6f2';
+
+    // ─── COLOR PRESETS (chosen for dark BG contrast) ─────────────────────
+    const SWATCHES = [
+      '#00d4ff', // cyan
+      '#34d399', // green
+      '#fbbf24', // amber
+      '#f87171', // red
+      '#a78bfa', // purple
+      '#fb923c', // orange
+      '#f472b6', // pink
+      '#94a3b8', // slate
+    ];
+    const DEFAULT_COLOR = SWATCHES[0];
+
+    // ─── STATE ───────────────────────────────────────────────────────────
+    const LS_KEY = 'har-ble-labels-v1';
+    let labels = [];            // [{hex:'0x02', label:'Standing', color:'#34d399'}]
+    let counts = new Map();     // byteValue (number) -> count
+    let totalEvents = 0;
+    let logEntries = [];        // [{ts, byte, label, color}]
+    const MAX_LOG = 100;
+
+    let bleDevice = null;
+    let bleServer = null;
+    let bleChar   = null;
+
+    // ─── UTILITIES ───────────────────────────────────────────────────────
+    const $ = (id) => document.getElementById(id);
+
+    const toHex = (b) =>
+      '0x' + b.toString(16).toUpperCase().padStart(2, '0');
+
+    /** Parse a user-typed hex like "2", "02", "0x02", "0X2" → number 0-255. Returns null on bad input. */
+    function parseHex(str) {
+      if (typeof str !== 'string') return null;
+      const s = str.trim().toLowerCase().replace(/^0x/, '');
+      if (!/^[0-9a-f]{1,2}$/.test(s)) return null;
+      const n = parseInt(s, 16);
+      return Number.isInteger(n) && n >= 0 && n <= 255 ? n : null;
+    }
+
+    const normHex = (str) => {
+      const n = parseHex(str);
+      return n === null ? null : toHex(n);
+    };
+
+    function formatTime(d = new Date()) {
+      const pad = (n, w=2) => String(n).padStart(w, '0');
+      return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    }
+
+    function findMapping(byteVal) {
+      for (const m of labels) {
+        const n = parseHex(m.hex);
+        if (n === byteVal) return m;
+      }
+      return null;
+    }
+
+    // ─── LOCAL STORAGE ───────────────────────────────────────────────────
+    function loadLabels() {
+      try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed
+          .filter(m => m && typeof m.hex === 'string')
+          .map(m => ({
+            hex: normHex(m.hex) || '0x00',
+            label: typeof m.label === 'string' ? m.label : '',
+            color: SWATCHES.includes(m.color) ? m.color : DEFAULT_COLOR,
+          }));
+      } catch { return []; }
+    }
+    function saveLabels() {
+      try { localStorage.setItem(LS_KEY, JSON.stringify(labels)); }
+      catch (e) { console.warn('[labels] save failed', e); }
+    }
+
+    // ─── STATUS PILL ─────────────────────────────────────────────────────
+    function setStatus(state, text) {
+      const el = $('status');
+      el.className = 'status ' + state;
+      el.textContent = text || state.toUpperCase();
+    }
+    function showError(msg) {
+      const b = $('errorBanner');
+      b.textContent = msg;
+      b.hidden = false;
+      setTimeout(() => { b.hidden = true; }, 4500);
+    }
+
+    // ─── BLE CONNECTION ──────────────────────────────────────────────────
+    function checkSupport() {
+      if (!navigator.bluetooth) {
+        $('unsupportedBanner').hidden = false;
+        $('connectBtn').disabled = true;
+        return false;
+      }
+      return true;
+    }
+
+    async function connect() {
+      if (!checkSupport()) return;
+      try {
+        setStatus('connecting', 'CONNECTING');
+        $('connectBtn').disabled = true;
+
+        bleDevice = await navigator.bluetooth.requestDevice({
+          filters: [{ services: [SERVICE_UUID] }],
+        });
+
+        bleDevice.addEventListener('gattserverdisconnected', onDisconnect);
+        bleServer = await bleDevice.gatt.connect();
+
+        const service = await bleServer.getPrimaryService(SERVICE_UUID);
+        bleChar = await service.getCharacteristic(DATA_UUID);
+
+        await bleChar.startNotifications();
+        bleChar.addEventListener('characteristicvaluechanged', onNotify);
+
+        setStatus('connected', 'CONNECTED');
+        $('connectBtn').hidden = true;
+        $('deviceInfo').hidden = false;
+        $('deviceName').textContent = bleDevice.name || '(unnamed)';
+      } catch (e) {
+        console.error('[ble] connect error', e);
+        setStatus('disconnected', 'DISCONNECTED');
+        $('connectBtn').disabled = false;
+        // User cancelling the chooser throws NotFoundError — don't alarm them.
+        if (e && e.name !== 'NotFoundError') {
+          showError('Connect failed: ' + (e.message || e.name || 'unknown'));
+        }
+      }
+    }
+
+    function disconnect() {
+      try {
+        if (bleChar) {
+          bleChar.removeEventListener('characteristicvaluechanged', onNotify);
+        }
+        if (bleDevice && bleDevice.gatt.connected) {
+          bleDevice.gatt.disconnect();
+        }
+      } catch (e) { console.warn('[ble] disconnect', e); }
+      onDisconnect();
+    }
+
+    function onDisconnect() {
+      bleDevice = null;
+      bleServer = null;
+      bleChar   = null;
+      setStatus('disconnected', 'DISCONNECTED');
+      $('connectBtn').hidden = false;
+      $('connectBtn').disabled = false;
+      $('deviceInfo').hidden = true;
+    }
+
+    function onNotify(event) {
+      const v = event.target.value; // DataView
+      if (!v || v.byteLength < 1) return;
+      const byte = v.getUint8(0);
+      handleClassification(byte);
+    }
+
+    // ─── CLASSIFICATION PIPELINE ─────────────────────────────────────────
+    function handleClassification(byteVal) {
+      totalEvents++;
+      counts.set(byteVal, (counts.get(byteVal) || 0) + 1);
+
+      const m = findMapping(byteVal);
+      const label = (m && m.label.trim()) || null;
+      const color = m ? m.color : null;
+
+      const entry = { ts: Date.now(), byte: byteVal, label, color };
+      logEntries.unshift(entry);
+      if (logEntries.length > MAX_LOG) logEntries.length = MAX_LOG;
+
+      renderLive(entry);
+      renderLogEntry(entry, true);
+      renderChart();
+    }
+
+    // ─── RENDER: LIVE CARD ───────────────────────────────────────────────
+    function renderLive(entry) {
+      const valueEl = $('liveValue');
+      const card    = $('liveCard');
+      const hex     = toHex(entry.byte);
+      const display = entry.label || hex;
+      const accent  = entry.color || 'var(--text-mute)';
+
+      valueEl.textContent = display;
+      valueEl.classList.remove('placeholder');
+      $('liveHex').textContent = hex;
+      $('liveTime').textContent = formatTime(new Date(entry.ts));
+      $('liveCount').textContent = totalEvents + (totalEvents === 1 ? ' EVENT' : ' EVENTS');
+
+      card.style.setProperty('--live-accent', accent);
+
+      // re-trigger flash animation
+      card.classList.remove('flash');
+      void card.offsetWidth;
+      card.classList.add('flash');
+    }
+
+    // ─── RENDER: LABEL EDITOR ────────────────────────────────────────────
+    function renderLabels() {
+      const list = $('labelsList');
+      const empty = $('labelsEmpty');
+      list.innerHTML = '';
+
+      if (labels.length === 0) {
+        empty.hidden = false;
+      } else {
+        empty.hidden = true;
+        labels.forEach((m, idx) => list.appendChild(buildLabelRow(m, idx)));
+      }
+    }
+
+    function buildLabelRow(mapping, idx) {
+      const row = document.createElement('div');
+      row.className = 'label-row';
+
+      // hex input
+      const hexIn = document.createElement('input');
+      hexIn.className = 'hex-in';
+      hexIn.type = 'text';
+      hexIn.value = mapping.hex;
+      hexIn.placeholder = '0x00';
+      hexIn.spellcheck = false;
+      hexIn.autocomplete = 'off';
+      hexIn.maxLength = 4;
+      hexIn.addEventListener('change', () => {
+        const norm = normHex(hexIn.value);
+        if (norm === null) {
+          hexIn.value = mapping.hex; // revert
+          showError('Invalid hex: use 0x00–0xFF');
+          return;
+        }
+        // prevent duplicate hex values across rows
+        const dup = labels.findIndex((m, i) => i !== idx && parseHex(m.hex) === parseHex(norm));
+        if (dup !== -1) {
+          hexIn.value = mapping.hex;
+          showError(`Duplicate: ${norm} is already mapped`);
+          return;
+        }
+        mapping.hex = norm;
+        hexIn.value = norm;
+        saveLabels();
+        // a previous live result may now be re-labeled — re-render last
+        if (logEntries[0]) renderLive(logEntries[0]);
+        renderChart();
+        renderAllLog();
+      });
+
+      // label input
+      const nameIn = document.createElement('input');
+      nameIn.className = 'name-in';
+      nameIn.type = 'text';
+      nameIn.value = mapping.label;
+      nameIn.placeholder = 'Activity name';
+      nameIn.maxLength = 40;
+      nameIn.spellcheck = false;
+      nameIn.autocomplete = 'off';
+      nameIn.addEventListener('input', () => {
+        mapping.label = nameIn.value;
+        saveLabels();
+        if (logEntries[0]) renderLive(logEntries[0]);
+        renderChart();
+        renderAllLog();
+      });
+
+      // swatches
+      const sw = document.createElement('div');
+      sw.className = 'swatches';
+      SWATCHES.forEach(c => {
+        const b = document.createElement('button');
+        b.className = 'swatch' + (c === mapping.color ? ' active' : '');
+        b.style.setProperty('--swatch', c);
+        b.type = 'button';
+        b.setAttribute('aria-label', 'Color ' + c);
+        b.addEventListener('click', () => {
+          mapping.color = c;
+          sw.querySelectorAll('.swatch').forEach(el => el.classList.remove('active'));
+          b.classList.add('active');
+          saveLabels();
+          if (logEntries[0] && parseHex(mapping.hex) === logEntries[0].byte) {
+            renderLive(logEntries[0]);
+          }
+          renderChart();
+          renderAllLog();
+        });
+        sw.appendChild(b);
+      });
+
+      // delete
+      const del = document.createElement('button');
+      del.className = 'row-del';
+      del.type = 'button';
+      del.textContent = '×';
+      del.setAttribute('aria-label', 'Delete mapping');
+      del.addEventListener('click', () => {
+        labels.splice(idx, 1);
+        saveLabels();
+        renderLabels();
+        if (logEntries[0]) renderLive(logEntries[0]);
+        renderChart();
+        renderAllLog();
+      });
+
+      row.appendChild(hexIn);
+      row.appendChild(nameIn);
+      row.appendChild(sw);
+      row.appendChild(del);
+      return row;
+    }
+
+    function addLabelMapping() {
+      // pick the lowest unused hex 0x00..0xFF
+      const used = new Set(labels.map(m => parseHex(m.hex)).filter(n => n !== null));
+      let next = 0;
+      while (used.has(next) && next < 256) next++;
+      if (next > 255) {
+        showError('All 256 hex values mapped — delete one first');
+        return;
+      }
+      const usedColors = labels.map(m => m.color);
+      const freshColor = SWATCHES.find(c => !usedColors.includes(c)) || DEFAULT_COLOR;
+      labels.push({ hex: toHex(next), label: '', color: freshColor });
+      saveLabels();
+      renderLabels();
+      // focus the new row's name input for immediate typing
+      const rows = $('labelsList').querySelectorAll('.label-row');
+      const last = rows[rows.length - 1];
+      if (last) last.querySelector('.name-in').focus();
+    }
+
+    // ─── RENDER: CHART ───────────────────────────────────────────────────
+    function renderChart() {
+      const chart = $('chart');
+      const empty = $('chartEmpty');
+      chart.innerHTML = '';
+
+      if (counts.size === 0) {
+        empty.hidden = false;
+        return;
+      }
+      empty.hidden = true;
+
+      // sort: descending by count, tie-break ascending by byte
+      const entries = [...counts.entries()].sort((a, b) => {
+        if (b[1] !== a[1]) return b[1] - a[1];
+        return a[0] - b[0];
+      });
+
+      const max = entries[0][1];
+      const frag = document.createDocumentFragment();
+
+      for (const [byte, n] of entries) {
+        const m = findMapping(byte);
+        const label = (m && m.label.trim()) || '—';
+        const color = m ? m.color : 'var(--text-mute)';
+        const pct = max > 0 ? (n / max) * 100 : 0;
+
+        const row = document.createElement('div');
+        row.className = 'bar-row';
+
+        const lbl = document.createElement('div');
+        lbl.className = 'bar-label';
+        lbl.innerHTML = `<span class="h">${toHex(byte)}</span>${escapeHtml(label)}`;
+
+        const track = document.createElement('div');
+        track.className = 'bar-track';
+        track.style.setProperty('--w', pct.toFixed(1) + '%');
+        track.style.setProperty('--bar-color', color);
+
+        const cnt = document.createElement('div');
+        cnt.className = 'bar-count';
+        cnt.textContent = n.toString();
+
+        row.appendChild(lbl);
+        row.appendChild(track);
+        row.appendChild(cnt);
+        frag.appendChild(row);
+      }
+      chart.appendChild(frag);
+    }
+
+    function resetChart() {
+      counts.clear();
+      totalEvents = 0;
+      $('liveCount').textContent = '0 EVENTS';
+      renderChart();
+    }
+
+    // ─── RENDER: LOG ─────────────────────────────────────────────────────
+    function renderLogEntry(entry, prepend) {
+      const log = $('log');
+      $('logEmpty').hidden = true;
+
+      const row = document.createElement('div');
+      row.className = 'log-entry';
+
+      const t = document.createElement('span');
+      t.className = 't';
+      t.textContent = formatTime(new Date(entry.ts));
+
+      const c = document.createElement('span');
+      c.className = 'c';
+      const m = findMapping(entry.byte);
+      const color = (m && m.color) || 'var(--text-mute)';
+      c.style.setProperty('--c', color);
+
+      const l = document.createElement('span');
+      const labelText = (m && m.label.trim()) || '—';
+      l.className = 'l' + (m && m.label.trim() ? '' : ' unlabeled');
+      l.textContent = labelText;
+
+      const h = document.createElement('span');
+      h.className = 'h';
+      h.textContent = toHex(entry.byte);
+
+      row.appendChild(t);
+      row.appendChild(c);
+      row.appendChild(l);
+      row.appendChild(h);
+
+      if (prepend && log.firstChild) {
+        log.insertBefore(row, log.firstChild);
+      } else {
+        log.appendChild(row);
+      }
+
+      // trim DOM to MAX_LOG
+      const rows = log.querySelectorAll('.log-entry');
+      if (rows.length > MAX_LOG) {
+        for (let i = MAX_LOG; i < rows.length; i++) rows[i].remove();
+      }
+    }
+
+    function renderAllLog() {
+      const log = $('log');
+      const empty = $('logEmpty');
+      // remove all log-entry rows but keep the empty placeholder
+      log.querySelectorAll('.log-entry').forEach(n => n.remove());
+      if (logEntries.length === 0) {
+        empty.hidden = false;
+        return;
+      }
+      empty.hidden = true;
+      // re-render oldest first (so append order = newest on top after we prepend)
+      const reversed = [...logEntries].reverse();
+      for (const e of reversed) renderLogEntry(e, true);
+    }
+
+    function clearLog() {
+      logEntries = [];
+      $('log').querySelectorAll('.log-entry').forEach(n => n.remove());
+      $('logEmpty').hidden = false;
+    }
+
+    // ─── HELPERS ─────────────────────────────────────────────────────────
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // ─── WIRE UP ─────────────────────────────────────────────────────────
+    function init() {
+      checkSupport();
+      labels = loadLabels();
+      renderLabels();
+      renderChart();
+
+      $('connectBtn').addEventListener('click', connect);
+      $('disconnectBtn').addEventListener('click', disconnect);
+      $('addLabelBtn').addEventListener('click', addLabelMapping);
+      $('resetChartBtn').addEventListener('click', resetChart);
+      $('clearLogBtn').addEventListener('click', clearLog);
+
+      // safety: drop BLE cleanly if user navigates away
+      window.addEventListener('beforeunload', () => {
+        try { if (bleDevice && bleDevice.gatt.connected) bleDevice.gatt.disconnect(); }
+        catch {}
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  </script>
+</body>
+</html>
